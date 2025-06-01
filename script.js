@@ -2,7 +2,7 @@
 const firebaseConfig = {
   apiKey: "AIzaSyDrXAUR40G8OgvRGz2H20gO6aisbITC7oY",
   authDomain: "interfaz-inventario-biomedico.firebaseapp.com",
-  databaseURL: "https://interfaz-inventario-biomedico-default-rtdb.firebaseio.com", // Asegúrate de tener esta línea
+  databaseURL: "https://interfaz-inventario-biomedico-default-rtdb.firebaseio.com",
   projectId: "interfaz-inventario-biomedico",
   storageBucket: "interfaz-inventario-biomedico.appspot.com",
   messagingSenderId: "1093995303517",
@@ -12,14 +12,14 @@ const firebaseConfig = {
 
 // Inicializa Firebase
 firebase.initializeApp(firebaseConfig);
-
-// Referencias a Realtime Database
 const database = firebase.database();
+
+// Referencias a la base de datos
 const inventoryRef = database.ref('inventory');
 const entriesRef = database.ref('entries');
 const outputsRef = database.ref('outputs');
 
-// Datos iniciales
+// Datos en memoria
 let inventory = [];
 let entries = [];
 let outputs = [];
@@ -27,9 +27,6 @@ let qrScanner = null;
 
 // Cargar datos iniciales al cargar la página
 document.addEventListener('DOMContentLoaded', function() {
-    // Cargar datos de Firebase
-    loadFirebaseData();
-    
     // Configurar listeners para cambios en tiempo real
     setupRealTimeListeners();
     
@@ -40,35 +37,9 @@ document.addEventListener('DOMContentLoaded', function() {
     setDefaultDates();
 });
 
-// Cargar datos iniciales de Firebase
-function loadFirebaseData() {
-    inventoryRef.once('value').then((snapshot) => {
-        const data = snapshot.val();
-        if (data) {
-            inventory = Object.values(data);
-        } else {
-            // Si no hay datos, cargar los datos iniciales
-            loadInitialInventory();
-        }
-        loadInventory();
-        checkStockAlerts();
-    });
-    
-    entriesRef.once('value').then((snapshot) => {
-        const data = snapshot.val();
-        entries = data ? Object.values(data) : [];
-        loadEntries();
-    });
-    
-    outputsRef.once('value').then((snapshot) => {
-        const data = snapshot.val();
-        outputs = data ? Object.values(data) : [];
-        loadOutputs();
-    });
-}
-
 // Configurar listeners para cambios en tiempo real
 function setupRealTimeListeners() {
+    // Listener para inventario
     inventoryRef.on('value', (snapshot) => {
         const data = snapshot.val();
         inventory = data ? Object.values(data) : [];
@@ -79,92 +50,18 @@ function setupRealTimeListeners() {
         loadTypeFilterOptions();
     });
     
+    // Listener para entradas
     entriesRef.on('value', (snapshot) => {
         const data = snapshot.val();
         entries = data ? Object.values(data) : [];
         loadEntries();
     });
     
+    // Listener para salidas
     outputsRef.on('value', (snapshot) => {
         const data = snapshot.val();
         outputs = data ? Object.values(data) : [];
         loadOutputs();
-    });
-}
-
-// Cargar datos iniciales si la base está vacía
-function loadInitialInventory() {
-    const initialInventory = [
-        {
-            id: '9.1',
-            name: 'BRAZALETE REUSABLE',
-            type: 'BRAZALETE REUSABLE',
-            voucher: '19005174',
-            characteristic: '2 VÍAS',
-            brand: 'WELCH ALLYN',
-            model: 'VARIOS',
-            size: 'PEDIÁTRICO 15-21 CM 13.5-19.5 CM',
-            stock: 14,
-            minStock: 5,
-            expiration: null
-        },
-        {
-            id: '9.13',
-            name: 'MANGO DE LARINGOSCOPIO',
-            type: 'MANGO DE LARINGOSCOPIO',
-            voucher: '50290070',
-            characteristic: 'N/A',
-            brand: 'RIESTER',
-            model: 'RIESTER',
-            size: 'N/A',
-            stock: 1,
-            minStock: 5,
-            expiration: null
-        },
-        {
-            id: '9.14',
-            name: 'FOCO DE HALÓGENO 11429',
-            type: 'FOCO DE HALÓGENO',
-            voucher: '50290070',
-            characteristic: 'LARINGOSCOPIO',
-            brand: 'RIESTER',
-            model: 'RIESTER',
-            size: 'N/A',
-            stock: 16,
-            minStock: 5,
-            expiration: null
-        },
-        {
-            id: '9.15',
-            name: 'JUEGO DE CAMPANAS PARA ESTETOSCOPIO (membranas)',
-            type: 'JUEGO DE CAMPANAS',
-            voucher: '19007376-B',
-            characteristic: 'N/A',
-            brand: 'RIESTER',
-            model: 'RIESTER',
-            size: 'N/A',
-            stock: 34,
-            minStock: 5,
-            expiration: null
-        },
-        {
-            id: '9.23',
-            name: 'BATERÍA RECARGABLE',
-            type: 'BATERÍA RECARGABLE',
-            voucher: '19009555',
-            characteristic: 'LARINGOSCOPIO',
-            brand: 'WELCH ALLYN',
-            model: 'WELCH ALLYN',
-            size: 'N/A',
-            stock: 0,
-            minStock: 5,
-            expiration: null
-        }
-    ];
-    
-    // Guardar en Firebase
-    initialInventory.forEach(item => {
-        inventoryRef.child(item.id).set(item);
     });
 }
 
@@ -234,10 +131,6 @@ function confirmDeleteItem(id) {
 
 // Función para eliminar el insumo
 function deleteItem(id) {
-    const itemToDelete = inventory.find(item => item.id === id);
-    const deletedType = itemToDelete?.type;
-    
-    // Eliminar de Firebase
     inventoryRef.child(id).remove()
         .then(() => {
             // Eliminar entradas y salidas relacionadas
@@ -252,11 +145,6 @@ function deleteItem(id) {
                     outputsRef.child(output.id).remove();
                 }
             });
-            
-            if (deletedType && !inventory.some(item => item.type === deletedType)) {
-                loadItemTypeOptions();
-                loadTypeFilterOptions();
-            }
             
             alert('Insumo eliminado correctamente');
         })
@@ -450,22 +338,24 @@ function saveItem() {
     
     // Guardar en Firebase
     if (id) {
-        // Actualizar
-        inventoryRef.child(itemNumber).update(itemData)
+        // Actualizar existente
+        inventoryRef.child(id).update(itemData)
             .then(() => {
+                alert('Insumo actualizado correctamente');
                 closeModal('itemModal');
             })
             .catch(error => {
-                alert('Error al actualizar el insumo: ' + error.message);
+                alert('Error al actualizar: ' + error.message);
             });
     } else {
         // Crear nuevo
         inventoryRef.child(itemNumber).set(itemData)
             .then(() => {
+                alert('Insumo agregado correctamente');
                 closeModal('itemModal');
             })
             .catch(error => {
-                alert('Error al guardar el insumo: ' + error.message);
+                alert('Error al guardar: ' + error.message);
             });
     }
 }
