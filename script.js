@@ -1,7 +1,8 @@
-// Inicialización de Firebase
+// Configuración de Firebase
 const firebaseConfig = {
   apiKey: "AIzaSyDrXAUR40G8OgvRGz2H20gO6aisbITC7oY",
   authDomain: "interfaz-inventario-biomedico.firebaseapp.com",
+  databaseURL: "https://interfaz-inventario-biomedico-default-rtdb.firebaseio.com", // Asegúrate de tener esta línea
   projectId: "interfaz-inventario-biomedico",
   storageBucket: "interfaz-inventario-biomedico.appspot.com",
   messagingSenderId: "1093995303517",
@@ -11,9 +12,9 @@ const firebaseConfig = {
 
 // Inicializa Firebase
 firebase.initializeApp(firebaseConfig);
-const database = firebase.database();
 
-// Referencias a la base de datos
+// Referencias a Realtime Database
+const database = firebase.database();
 const inventoryRef = database.ref('inventory');
 const entriesRef = database.ref('entries');
 const outputsRef = database.ref('outputs');
