@@ -169,15 +169,20 @@
                 
                 <div class="form-group">
                     <label for="itemType"><i class="fas fa-list"></i> Tipo de Insumo:</label>
-                    <select id="itemType" required onchange="toggleCustomType()">
-                        <option value="">Seleccione un tipo</option>
-                        <option value="BRAZALETE REUSABLE">Brazalete Reusable</option>
-                        <option value="MANGO DE LARINGOSCOPIO">Mango de Laringoscopio</option>
-                        <option value="FOCO DE HALÓGENO">Foco de Halógeno</option>
-                        <option value="JUEGO DE CAMPANAS">Juego de Campanas</option>
-                        <option value="BATERÍA RECARGABLE">Batería Recargable</option>
-                        <option value="OTRO">Otro</option>
-                    </select>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <select id="itemType" required onchange="toggleCustomType()" style="flex: 1;">
+                            <option value="">Seleccione un tipo</option>
+                            <option value="BRAZALETE REUSABLE">Brazalete Reusable</option>
+                            <option value="MANGO DE LARINGOSCOPIO">Mango de Laringoscopio</option>
+                            <option value="FOCO DE HALÓGENO">Foco de Halógeno</option>
+                            <option value="JUEGO DE CAMPANAS">Juego de Campanas</option>
+                            <option value="BATERÍA RECARGABLE">Batería Recargable</option>
+                            <option value="OTRO">Otro (especificar)</option>
+                        </select>
+                        <button type="button" class="btn btn-info" onclick="openAddTypeModal()" style="width: auto;">
+                            <i class="fas fa-plus"></i> Nuevo
+                        </button>
+                    </div>
                     <input type="text" id="customType" style="display: none; margin-top: 0.5rem;" placeholder="Especificar tipo de insumo" class="form-input">
                 </div>
                 
@@ -409,6 +414,25 @@
                         <!-- Los datos se cargarán dinámicamente -->
                     </tbody>
                 </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para agregar tipo -->
+    <div id="typeModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('typeModal')">&times;</span>
+            <h2><i class="fas fa-tags"></i> Agregar Nuevo Tipo</h2>
+            
+            <div class="form-group">
+                <label for="newTypeName">Nombre del Tipo:</label>
+                <input type="text" id="newTypeName" class="form-input" placeholder="Ej: Equipo de diagnóstico">
+            </div>
+            
+            <div class="form-actions">
+                <button type="button" class="btn btn-primary" onclick="saveNewType()">
+                    <i class="fas fa-save"></i> Guardar Tipo
+                </button>
             </div>
         </div>
     </div>
