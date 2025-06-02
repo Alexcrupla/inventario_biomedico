@@ -194,16 +194,24 @@ function filterByType() {
 // Cargar opciones de filtro por tipo
 function loadTypeFilterOptions() {
     let typeFilter = document.getElementById('typeFilter');
+    
+    // Mantener solo la opción "Todos los tipos"
     while (typeFilter.options.length > 1) {
         typeFilter.remove(1);
     }
     
-    let types = [...new Set(inventory.map(item => item.type))];
-    types.forEach(type => {
-        let option = document.createElement('option');
-        option.value = type;
-        option.textContent = type;
-        typeFilter.appendChild(option);
+    // Obtener tipos únicos del inventario (sin duplicados)
+    let uniqueTypes = [...new Set(inventory.map(item => item.type))];
+    
+    // Agregar cada tipo solo una vez
+    uniqueTypes.forEach(type => {
+        // Verificar que no exista ya (aunque new Set debería evitarlo)
+        if (![...typeFilter.options].some(opt => opt.value === type)) {
+            let option = document.createElement('option');
+            option.value = type;
+            option.textContent = type;
+            typeFilter.appendChild(option);
+        }
     });
 }
 
