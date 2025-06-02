@@ -415,7 +415,7 @@ function editItem(id) {
 }
 
 // Guardar insumo (nuevo o editado)
-function saveItem() {
+async function saveItem() {
     let id = document.getElementById('itemId').value;
     let itemNumber = document.getElementById('itemNumber').value;
     let itemName = document.getElementById('itemName').value;
