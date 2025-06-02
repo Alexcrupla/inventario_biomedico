@@ -244,19 +244,53 @@ function toggleCustomType() {
 
 function loadItemTypeOptions() {
     let typeSelect = document.getElementById('itemType');
-    while (typeSelect.options.length > 6) { // Mantener las 5 opciones iniciales + "OTRO"
-        typeSelect.remove(6);
+    
+    // Mantener las opciones iniciales y cualquier tipo personalizado que se haya agregado
+    const initialOptions = ['', 'BRAZALETE REUSABLE', 'MANGO DE LARINGOSCOPIO', 'FOCO DE HALÓGENO', 'JUEGO DE CAMPANAS', 'BATERÍA RECARGABLE', 'OTRO'];
+    
+    // Guardar los tipos personalizados que ya estaban en el select
+    let customTypes = [];
+    for (let i = initialOptions.length; i < typeSelect.options.length; i++) {
+        customTypes.push(typeSelect.options[i].value);
     }
     
-    let existingTypes = [...new Set(inventory.map(item => item.type))].filter(t => t !== 'OTRO');
-    existingTypes.forEach(type => {
+    // Limpiar el select
+    typeSelect.innerHTML = '';
+    
+    // Agregar las opciones iniciales
+    initialOptions.forEach(optionValue => {
+        let option = document.createElement('option');
+        option.value = optionValue;
+        
+        if (optionValue === '') {
+            option.textContent = 'Seleccione un tipo';
+        } else {
+            option.textContent = optionValue;
+        }
+        
+        typeSelect.appendChild(option);
+    });
+    
+    // Agregar los tipos personalizados guardados
+    customTypes.forEach(type => {
         let option = document.createElement('option');
         option.value = type;
         option.textContent = type;
-        typeSelect.insertBefore(option, typeSelect.options[typeSelect.options.length - 1]);
+        typeSelect.insertBefore(option, typeSelect.options[typeSelect.options.length - 1]); // Insertar antes de "OTRO"
+    });
+    
+    // Agregar tipos únicos del inventario que no estén ya en las opciones
+    let existingTypes = [...new Set(inventory.map(item => item.type))].filter(t => t !== 'OTRO');
+    
+    existingTypes.forEach(type => {
+        if (![...typeSelect.options].some(opt => opt.value === type)) {
+            let option = document.createElement('option');
+            option.value = type;
+            option.textContent = type;
+            typeSelect.insertBefore(option, typeSelect.options[typeSelect.options.length - 1]); // Insertar antes de "OTRO"
+        }
     });
 }
-
 // Abrir modal para agregar insumo
 function openAddItemModal() {
     document.getElementById('itemModalTitle').textContent = 'Agregar Nuevo Insumo';
@@ -313,8 +347,22 @@ function saveItem() {
     let itemMinStock = parseInt(document.getElementById('itemMinStock').value);
     let itemExpiration = document.getElementById('itemExpiration').value;
     
+    // Manejar tipo personalizado
     if (itemType === 'OTRO' && customType) {
         itemType = customType;
+        
+        // Verificar si el tipo personalizado ya existe en las opciones
+        let typeSelect = document.getElementById('itemType');
+        let typeExists = [...typeSelect.options].some(opt => opt.value === customType);
+        
+        // Si no existe, agregarlo como nueva opción
+        if (!typeExists) {
+            let option = document.createElement('option');
+            option.value = customType;
+            option.textContent = customType;
+            // Insertar antes de la opción "OTRO"
+            typeSelect.insertBefore(option, typeSelect.options[typeSelect.options.length - 1]);
+        }
     }
     
     if (!itemNumber || !itemName || !itemType || isNaN(itemInitialStock) || isNaN(itemMinStock)) {
@@ -333,31 +381,24 @@ function saveItem() {
         size: itemSize,
         stock: itemInitialStock,
         minStock: itemMinStock,
-        expiration: itemExpiration ? new Date(itemExpiration).toISOString() : null
+        expiration: itemExpiration ? new Date(itemExpiration) : null
     };
     
-    // Guardar en Firebase
     if (id) {
-        // Actualizar existente
-        inventoryRef.child(id).update(itemData)
-            .then(() => {
-                alert('Insumo actualizado correctamente');
-                closeModal('itemModal');
-            })
-            .catch(error => {
-                alert('Error al actualizar: ' + error.message);
-            });
+        let index = inventory.findIndex(i => i.id === id);
+        if (index !== -1) {
+            inventory[index] = itemData;
+        }
     } else {
-        // Crear nuevo
-        inventoryRef.child(itemNumber).set(itemData)
-            .then(() => {
-                alert('Insumo agregado correctamente');
-                closeModal('itemModal');
-            })
-            .catch(error => {
-                alert('Error al guardar: ' + error.message);
-            });
+        inventory.push(itemData);
     }
+    
+    saveDataToLocalStorage();
+    closeModal('itemModal');
+    loadInventory();
+    checkStockAlerts();
+    loadItemOptions();
+    loadTypeFilterOptions();
 }
 
 // Generar código QR para un insumo
