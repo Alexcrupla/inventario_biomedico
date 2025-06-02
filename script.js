@@ -1,21 +1,4 @@
-// Configuración de Firebase
-const firebaseConfig = {
-  apiKey: "AIzaSyDrXAUR40G8OgvRGz2H20gO6aisbITC7oY",
-  authDomain: "interfaz-inventario-biomedico.firebaseapp.com",
-  databaseURL: "https://interfaz-inventario-biomedico-default-rtdb.firebaseio.com/",
-  projectId: "interfaz-inventario-biomedico",
-  storageBucket: "interfaz-inventario-biomedico.appspot.com",
-  messagingSenderId: "1093995303517",
-  appId: "1:1093995303517:web:40fbc5882f4299bcfa73b4",
-  measurementId: "G-YKK4PHB6DJ"
-};
-
-// Inicializa Firebase
-if (!firebase.apps.length) {
-  firebase.initializeApp(firebaseConfig);
-}
-const database = firebase.database();
-
+// Funciones para manejar localStorage
 function saveDataToLocalStorage() {
     localStorage.setItem('inventory', JSON.stringify(inventory));
     localStorage.setItem('entries', JSON.stringify(entries));
@@ -32,121 +15,96 @@ function loadDataFromLocalStorage() {
     if (savedOutputs) outputs = JSON.parse(savedOutputs);
 }
 
-function loadDataFromFirebase() {
-    try {
-        // Obtener inventario
-        const inventorySnapshot = await database.ref('inventory').once('value');
-        inventory = Object.values(inventorySnapshot.val() || {});
-        
-        // Obtener entradas
-        const entriesSnapshot = await database.ref('entries').once('value');
-        entries = Object.values(entriesSnapshot.val() || {});
-        
-        // Obtener salidas
-        const outputsSnapshot = await database.ref('outputs').once('value');
-        outputs = Object.values(outputsSnapshot.val() || {});
-        
-        // Guardar en localStorage como respaldo
-        saveDataToLocalStorage();
-    } catch (error) {
-        console.error("Error al cargar datos:", error);
-        // Usar datos locales si hay error
-        loadDataFromLocalStorage();
+// Datos iniciales
+const initialInventory = [
+    {
+        id: '9.1',
+        name: 'BRAZALETE REUSABLE',
+        type: 'BRAZALETE REUSABLE',
+        voucher: '19005174',
+        characteristic: '2 VÍAS',
+        brand: 'WELCH ALLYN',
+        model: 'VARIOS',
+        size: 'PEDIÁTRICO 15-21 CM 13.5-19.5 CM',
+        stock: 14,
+        minStock: 5,
+        expiration: null
+    },
+    {
+        id: '9.13',
+        name: 'MANGO DE LARINGOSCOPIO',
+        type: 'MANGO DE LARINGOSCOPIO',
+        voucher: '50290070',
+        characteristic: 'N/A',
+        brand: 'RIESTER',
+        model: 'RIESTER',
+        size: 'N/A',
+        stock: 1,
+        minStock: 5,
+        expiration: null
+    },
+    {
+        id: '9.14',
+        name: 'FOCO DE HALÓGENO 11429',
+        type: 'FOCO DE HALÓGENO',
+        voucher: '50290070',
+        characteristic: 'LARINGOSCOPIO',
+        brand: 'RIESTER',
+        model: 'RIESTER',
+        size: 'N/A',
+        stock: 16,
+        minStock: 5,
+        expiration: null
+    },
+    {
+        id: '9.15',
+        name: 'JUEGO DE CAMPANAS PARA ESTETOSCOPIO (membranas)',
+        type: 'JUEGO DE CAMPANAS',
+        voucher: '19007376-B',
+        characteristic: 'N/A',
+        brand: 'RIESTER',
+        model: 'RIESTER',
+        size: 'N/A',
+        stock: 34,
+        minStock: 5,
+        expiration: null
+    },
+    {
+        id: '9.23',
+        name: 'BATERÍA RECARGABLE',
+        type: 'BATERÍA RECARGABLE',
+        voucher: '19009555',
+        characteristic: 'LARINGOSCOPIO',
+        brand: 'WELCH ALLYN',
+        model: 'WELCH ALLYN',
+        size: 'N/A',
+        stock: 0,
+        minStock: 5,
+        expiration: null
     }
-}
+];
 
-// Referencias a la base de datos
-const inventoryRef = database.ref('inventory');
-const entriesRef = database.ref('entries');
-const outputsRef = database.ref('outputs');
-
-// Datos en memoria
 let inventory = [];
 let entries = [];
 let outputs = [];
 let qrScanner = null;
 
 // Cargar datos iniciales al cargar la página
-document.addEventListener('DOMContentLoaded', async function() {
-    try {
-        // Primero intentar cargar desde Firebase
-        await loadDataFromFirebase();
-        
-        // Si no hay datos en Firebase, usar los iniciales
-        if (inventory.length === 0) {
-            inventory = [...initialInventory];
-            // Guardar datos iniciales en Firebase
-            const updates = {};
-            initialInventory.forEach(item => {
-                updates['inventory/' + item.id] = item;
-            });
-            await database.ref().update(updates);
-        }
-        
-        // Cargar la interfaz
-        loadInventory();
-        checkStockAlerts();
-        loadItemOptions();
-        loadTypeFilterOptions();
-        setDefaultDates();
-    } catch (error) {
-        console.error("Error inicial:", error);
-        // Fallback a localStorage si hay error
-        loadDataFromLocalStorage();
-        if (inventory.length === 0) {
-            inventory = [...initialInventory];
-            saveDataToLocalStorage();
-        }
-        // Cargar la interfaz
-        loadInventory();
-        checkStockAlerts();
-        loadItemOptions();
-        loadTypeFilterOptions();
-        setDefaultDates();
+document.addEventListener('DOMContentLoaded', function() {
+    loadDataFromLocalStorage();
+    
+    if (inventory.length === 0) {
+        inventory = [...initialInventory];
+        saveDataToLocalStorage();
     }
+    
+    loadInventory();
+    checkStockAlerts();
+    loadItemOptions();
+    loadItemTypeOptions();
+    loadTypeFilterOptions();
+    setDefaultDates();
 });
-
-function setDefaultDates() {
-    // Verificar si los elementos existen antes de asignar valores
-    const dateFrom = document.getElementById('movementDateFrom');
-    const dateTo = document.getElementById('movementDateTo');
-    
-    if (dateFrom && dateTo) {
-        let today = new Date();
-        let firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-        
-        dateFrom.value = firstDayOfMonth.toISOString().split('T')[0];
-        dateTo.value = today.toISOString().split('T')[0];
-    }
-}
-
-// Configurar listeners para cambios en tiempo real
-function setupRealTimeListeners() {
-    // Listener para inventario
-    inventoryRef.on('value', (snapshot) => {
-        const data = snapshot.val();
-        inventory = data ? Object.values(data) : [];
-        loadInventory();
-        checkStockAlerts();
-        loadItemOptions();
-        loadItemTypeOptions();
-        loadTypeFilterOptions();
-    });
-    
-    // Listener para entradas
-    entriesRef.on('value', (snapshot) => {
-        const data = snapshot.val();
-        entries = data ? Object.values(data) : [];
-        loadEntries();
-    });
-    
-    // Listener para salidas
-    outputsRef.on('value', (snapshot) => {
-        const data = snapshot.val();
-        outputs = data ? Object.values(data) : [];
-        loadOutputs();
-    });
-}
 
 // Funciones para manejar las pestañas
 function openTab(evt, tabName) {
@@ -214,26 +172,27 @@ function confirmDeleteItem(id) {
 
 // Función para eliminar el insumo
 function deleteItem(id) {
-    inventoryRef.child(id).remove()
-        .then(() => {
-            // Eliminar entradas y salidas relacionadas
-            entries.forEach(entry => {
-                if (entry.itemId === id) {
-                    entriesRef.child(entry.id).remove();
-                }
-            });
-            
-            outputs.forEach(output => {
-                if (output.itemId === id) {
-                    outputsRef.child(output.id).remove();
-                }
-            });
-            
-            alert('Insumo eliminado correctamente');
-        })
-        .catch(error => {
-            alert('Error al eliminar el insumo: ' + error.message);
-        });
+    const itemToDelete = inventory.find(item => item.id === id);
+    const deletedType = itemToDelete?.type;
+    
+    inventory = inventory.filter(item => item.id !== id);
+    entries = entries.filter(entry => entry.itemId !== id);
+    outputs = outputs.filter(output => output.itemId !== id);
+    
+    saveDataToLocalStorage();
+    
+    if (deletedType && !inventory.some(item => item.type === deletedType)) {
+        loadItemTypeOptions();
+        loadTypeFilterOptions();
+    }
+    
+    loadInventory();
+    loadEntries();
+    loadOutputs();
+    checkStockAlerts();
+    loadItemOptions();
+    
+    alert('Insumo eliminado correctamente');
 }
 
 // Buscar en el inventario
@@ -276,22 +235,17 @@ function filterByType() {
 
 // Cargar opciones de filtro por tipo
 function loadTypeFilterOptions() {
-    const typeFilter = document.getElementById('typeFilter');
+    let typeFilter = document.getElementById('typeFilter');
+    while (typeFilter.options.length > 1) {
+        typeFilter.remove(1);
+    }
     
-    // Mantener solo "Todos los tipos"
-    typeFilter.innerHTML = '<option value="all">Todos los tipos</option>';
-    
-    // Obtener tipos únicos del inventario
-    const uniqueTypes = [...new Set(inventory.map(item => item.type))];
-    
-    // Agregar cada tipo solo una vez
-    uniqueTypes.forEach(type => {
-        if (type && ![...typeFilter.options].some(opt => opt.value === type)) {
-            const option = document.createElement('option');
-            option.value = type;
-            option.textContent = type;
-            typeFilter.appendChild(option);
-        }
+    let types = [...new Set(inventory.map(item => item.type))];
+    types.forEach(type => {
+        let option = document.createElement('option');
+        option.value = type;
+        option.textContent = type;
+        typeFilter.appendChild(option);
     });
 }
 
@@ -327,50 +281,31 @@ function toggleCustomType() {
     } else {
         customTypeInput.style.display = 'none';
         customTypeInput.required = false;
+        customTypeInput.value = '';
     }
 }
 
 function loadItemTypeOptions() {
-    const typeSelect = document.getElementById('itemType');
+    let typeSelect = document.getElementById('itemType');
     
-    // Opciones base que siempre deben estar
-    const baseOptions = [
-        {value: '', text: 'Seleccione un tipo'},
-        {value: 'BRAZALETE REUSABLE', text: 'Brazalete Reusable'},
-        {value: 'MANGO DE LARINGOSCOPIO', text: 'Mango de Laringoscopio'},
-        {value: 'FOCO DE HALÓGENO', text: 'Foco de Halógeno'},
-        {value: 'JUEGO DE CAMPANAS', text: 'Juego de Campanas'},
-        {value: 'BATERÍA RECARGABLE', text: 'Batería Recargable'},
-        {value: 'OTRO', text: 'Otro'}
-    ];
+    // Mantener solo las opciones iniciales (las primeras 6)
+    while (typeSelect.options.length > 6) {
+        typeSelect.remove(6);
+    }
     
-    // Limpiar el select
-    typeSelect.innerHTML = '';
+    // Obtener tipos únicos del inventario, excluyendo "OTRO"
+    let existingTypes = [...new Set(inventory.map(item => item.type))].filter(t => t !== 'OTRO');
     
-    // Agregar opciones base
-    baseOptions.forEach(option => {
-        const optElement = document.createElement('option');
-        optElement.value = option.value;
-        optElement.textContent = option.text;
-        typeSelect.appendChild(optElement);
-    });
+    // Filtrar tipos que no están ya en las opciones iniciales
+    const initialOptions = ['BRAZALETE REUSABLE', 'MANGO DE LARINGOSCOPIO', 'FOCO DE HALÓGENO', 'JUEGO DE CAMPANAS', 'BATERÍA RECARGABLE'];
+    existingTypes = existingTypes.filter(type => !initialOptions.includes(type));
     
-    // Obtener tipos únicos del inventario que no son opciones base
-    const existingTypes = [...new Set(inventory.map(item => item.type))];
-    const baseValues = baseOptions.map(opt => opt.value);
-    
+    // Agregar los tipos adicionales encontrados en el inventario
     existingTypes.forEach(type => {
-        // Solo agregar si no es una opción base y no está vacío
-        if (type && !baseValues.includes(type)) {
-            // Verificar que no exista ya
-            if (![...typeSelect.options].some(opt => opt.value === type)) {
-                const option = document.createElement('option');
-                option.value = type;
-                option.textContent = type;
-                // Insertar antes de la opción "OTRO"
-                typeSelect.insertBefore(option, typeSelect.options[typeSelect.options.length - 1]);
-            }
-        }
+        let option = document.createElement('option');
+        option.value = type;
+        option.textContent = type;
+        typeSelect.insertBefore(option, typeSelect.options[typeSelect.options.length - 1]); // Insertar antes de "OTRO"
     });
 }
 
@@ -395,7 +330,15 @@ function editItem(id) {
     
     let typeSelect = document.getElementById('itemType');
     typeSelect.value = item.type;
-    toggleCustomType();
+    
+    // Manejar el caso cuando el tipo no está en las opciones
+    if (![...typeSelect.options].some(opt => opt.value === item.type)) {
+        typeSelect.value = 'OTRO';
+        document.getElementById('customType').value = item.type;
+        document.getElementById('customType').style.display = 'block';
+    } else {
+        document.getElementById('customType').style.display = 'none';
+    }
     
     document.getElementById('itemVoucher').value = item.voucher;
     document.getElementById('itemCharacteristic').value = item.characteristic;
@@ -415,7 +358,7 @@ function editItem(id) {
 }
 
 // Guardar insumo (nuevo o editado)
-async function saveItem() {
+function saveItem() {
     let id = document.getElementById('itemId').value;
     let itemNumber = document.getElementById('itemNumber').value;
     let itemName = document.getElementById('itemName').value;
@@ -430,24 +373,14 @@ async function saveItem() {
     let itemMinStock = parseInt(document.getElementById('itemMinStock').value);
     let itemExpiration = document.getElementById('itemExpiration').value;
     
-   // Manejar tipo personalizado
-    if (itemType === 'OTRO' && customType) {
-        itemType = customType;
-        
-        // Verificar si el tipo personalizado ya existe
-        const typeSelect = document.getElementById('itemType');
-        const typeExists = [...typeSelect.options].some(opt => opt.value === customType);
-        
-        // Si no existe y no está vacío, agregarlo
-        if (!typeExists && customType.trim() !== '') {
-            const option = document.createElement('option');
-            option.value = customType;
-            option.textContent = customType;
-            // Insertar antes de "OTRO"
-            typeSelect.insertBefore(option, typeSelect.options[typeSelect.options.length - 1]);
+    if (itemType === 'OTRO') {
+        if (!customType) {
+            alert('Por favor especifique el tipo de insumo');
+            return;
         }
+        itemType = customType;
     }
-  
+    
     if (!itemNumber || !itemName || !itemType || isNaN(itemInitialStock) || isNaN(itemMinStock)) {
         alert('Por favor complete todos los campos requeridos');
         return;
@@ -467,30 +400,22 @@ async function saveItem() {
         expiration: itemExpiration ? new Date(itemExpiration) : null
     };
     
- try {
-        if (id) {
-            // Actualizar en Realtime Database
-            await database.ref('inventory/' + id).update(itemData);
-        } else {
-            // Crear nuevo en Realtime Database
-            await database.ref('inventory/' + itemNumber).set(itemData);
+    if (id) {
+        let index = inventory.findIndex(i => i.id === id);
+        if (index !== -1) {
+            inventory[index] = itemData;
         }
-
-        // Actualizar datos locales
-        await loadDataFromFirebase();
-        
-        // Continuar con el resto de la lógica
-        closeModal('itemModal');
-        loadInventory();
-        checkStockAlerts();
-        loadItemOptions();
-        loadTypeFilterOptions();
-        
-        alert('Insumo guardado correctamente');
-    } catch (error) {
-        console.error("Error al guardar:", error);
-        alert('Error al guardar: ' + error.message);
+    } else {
+        inventory.push(itemData);
     }
+    
+    saveDataToLocalStorage();
+    closeModal('itemModal');
+    loadInventory();
+    checkStockAlerts();
+    loadItemOptions();
+    loadItemTypeOptions();
+    loadTypeFilterOptions();
 }
 
 // Generar código QR para un insumo
@@ -551,7 +476,7 @@ function viewItemDetails(id) {
     `;
     
     if (item.expiration) {
-        detailsHTML += `<p><strong>Fecha de Caducidad:</strong> ${new Date(item.expiration).toLocaleDateString()}</p>`;
+        detailsHTML += `<p><strong>Fecha de Caducidad:</strong> ${item.expiration.toLocaleDateString()}</p>`;
     }
     
     document.getElementById('itemDetails').innerHTML = detailsHTML;
@@ -559,7 +484,6 @@ function viewItemDetails(id) {
     let movementsBody = document.getElementById('movementsTableBody');
     movementsBody.innerHTML = '';
     
-    // Filtrar movimientos para este item
     let itemEntries = entries.filter(entry => entry.itemId === id);
     let itemOutputs = outputs.filter(output => output.itemId === id);
     
@@ -623,7 +547,7 @@ function openAddEntryModal() {
 }
 
 // Guardar entrada
-async function saveEntry() {
+function saveEntry() {
     let itemId = document.getElementById('entryItem').value;
     let voucher = document.getElementById('entryVoucher').value;
     let quantity = parseInt(document.getElementById('entryQuantity').value);
@@ -640,41 +564,22 @@ async function saveEntry() {
         return;
     }
     
-    let entryId = Date.now().toString();
     let entry = {
-        id: entryId,
+        id: Date.now().toString(),
         itemId: itemId,
         voucher: voucher,
         quantity: quantity,
-        date: new Date(date).toISOString()
+        date: new Date(date)
     };
     
-    try {
-        // Guardar en Firebase
-        const newEntryRef = database.ref('entries').push();
-        await newEntryRef.set({
-            ...entry,
-            id: newEntryRef.key
-        });
-        
-        // Actualizar inventario en Firebase
-        await database.ref('inventory/' + entry.itemId + '/stock')
-            .transaction(currentStock => (currentStock || 0) + entry.quantity);
-        
-        // Actualizar datos locales
-        await loadDataFromFirebase();
-        
-        // Cerrar modal y actualizar interfaz
-        closeModal('entryModal');
-        loadInventory();
-        checkStockAlerts();
-        loadEntries();
-        
-        alert('Entrada registrada correctamente');
-    } catch (error) {
-        console.error("Error al guardar entrada:", error);
-        alert('Error al registrar entrada: ' + error.message);
-    }
+    entries.push(entry);
+    inventory[itemIndex].stock += quantity;
+    
+    saveDataToLocalStorage();
+    closeModal('entryModal');
+    loadInventory();
+    checkStockAlerts();
+    loadEntries();
 }
 
 // Ver detalles de entrada
@@ -803,7 +708,7 @@ function updateAvailableStock() {
 }
 
 // Guardar salida
-async function saveOutput() {
+function saveOutput() {
     let itemId = document.getElementById('outputItem').value;
     let os = document.getElementById('outputOS').value;
     let engineer = document.getElementById('outputEngineer').value;
@@ -827,44 +732,25 @@ async function saveOutput() {
         return;
     }
     
-    let outputId = Date.now().toString();
     let output = {
-        id: outputId,
+        id: Date.now().toString(),
         itemId: itemId,
         os: os,
         engineer: engineer,
         quantity: quantity,
-        date: new Date(date).toISOString(),
+        date: new Date(date),
         movementType: movementType,
         status: movementType === 'loan' ? 'pending' : 'completed'
     };
     
-    try {
-        // Guardar en Firebase
-        const newOutputRef = database.ref('outputs').push();
-        await newOutputRef.set({
-            ...output,
-            id: newOutputRef.key
-        });
-        
-        // Actualizar inventario en Firebase
-        await database.ref('inventory/' + output.itemId + '/stock')
-            .transaction(currentStock => (currentStock || 0) - output.quantity);
-        
-        // Actualizar datos locales
-        await loadDataFromFirebase();
-        
-        // Cerrar modal y actualizar interfaz
-        closeModal('outputModal');
-        loadInventory();
-        checkStockAlerts();
-        loadOutputs();
-        
-        alert('Salida registrada correctamente');
-    } catch (error) {
-        console.error("Error al guardar salida:", error);
-        alert('Error al registrar salida: ' + error.message);
-    }
+    outputs.push(output);
+    inventory[itemIndex].stock -= quantity;
+    
+    saveDataToLocalStorage();
+    closeModal('outputModal');
+    loadInventory();
+    checkStockAlerts();
+    loadOutputs();
 }
 
 // Ver detalles de salida
@@ -963,24 +849,15 @@ function restoreLoan(id) {
     let itemIndex = inventory.findIndex(i => i.id === output.itemId);
     
     if (itemIndex !== -1) {
-        let newStock = inventory[itemIndex].stock + output.quantity;
-        
-        // Actualizar stock en Firebase
-        inventoryRef.child(output.itemId).update({ stock: newStock })
-            .then(() => {
-                // Eliminar la salida de Firebase
-                outputsRef.child(id).remove()
-                    .then(() => {
-                        // Actualizar la interfaz se hará automáticamente por los listeners
-                    })
-                    .catch(error => {
-                        alert('Error al eliminar el préstamo: ' + error.message);
-                    });
-            })
-            .catch(error => {
-                alert('Error al actualizar el stock: ' + error.message);
-            });
+        inventory[itemIndex].stock += output.quantity;
     }
+    
+    outputs.splice(outputIndex, 1);
+    saveDataToLocalStorage();
+    
+    loadInventory();
+    loadOutputs();
+    checkStockAlerts();
 }
 
 // Cargar salidas en la tabla
@@ -1350,7 +1227,7 @@ function generateExpiringReport() {
     
     let expiringItems = inventory.filter(item => {
         if (!item.expiration) return false;
-        return new Date(item.expiration) <= limitDate && new Date(item.expiration) >= today;
+        return item.expiration <= limitDate && item.expiration >= today;
     });
     
     if (expiringItems.length === 0) {
@@ -1376,7 +1253,7 @@ function generateExpiringReport() {
     `;
     
     expiringItems.forEach(item => {
-        let daysRemaining = Math.ceil((new Date(item.expiration) - today) / (1000 * 60 * 60 * 24));
+        let daysRemaining = Math.ceil((item.expiration - today) / (1000 * 60 * 60 * 24));
         
         html += `
             <tr>
@@ -1384,7 +1261,7 @@ function generateExpiringReport() {
                 <td>${item.name}</td>
                 <td>${item.type}</td>
                 <td>${item.stock}</td>
-                <td>${new Date(item.expiration).toLocaleDateString()}</td>
+                <td>${item.expiration.toLocaleDateString()}</td>
                 <td>${daysRemaining}</td>
             </tr>
         `;
@@ -1430,3 +1307,11 @@ function closeModal(modalId) {
     document.getElementById(modalId).style.display = 'none';
 }
 
+// Establecer fechas por defecto en los filtros
+function setDefaultDates() {
+    let today = new Date();
+    let firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    
+    document.getElementById('movementDateFrom').value = firstDayOfMonth.toISOString().split('T')[0];
+    document.getElementById('movementDateTo').value = today.toISOString().split('T')[0];
+}
