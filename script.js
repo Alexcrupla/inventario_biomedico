@@ -2,7 +2,7 @@
 const firebaseConfig = {
   apiKey: "AIzaSyDrXAUR40G8OgvRGz2H20gO6aisbITC7oY",
   authDomain: "interfaz-inventario-biomedico.firebaseapp.com",
-  databaseURL: "https://interfaz-inventario-biomedico-default-rtdb.firebaseio.com",
+  databaseURL: "https://interfaz-inventario-biomedico-default-rtdb.firebaseio.com/",
   projectId: "interfaz-inventario-biomedico",
   storageBucket: "interfaz-inventario-biomedico.appspot.com",
   messagingSenderId: "1093995303517",
