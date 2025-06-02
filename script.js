@@ -14,6 +14,29 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const database = firebase.database();
 
+async function loadDataFromFirebase() {
+    try {
+        // Obtener inventario
+        const inventorySnapshot = await database.ref('inventory').once('value');
+        inventory = Object.values(inventorySnapshot.val() || {});
+        
+        // Obtener entradas
+        const entriesSnapshot = await database.ref('entries').once('value');
+        entries = Object.values(entriesSnapshot.val() || {});
+        
+        // Obtener salidas
+        const outputsSnapshot = await database.ref('outputs').once('value');
+        outputs = Object.values(outputsSnapshot.val() || {});
+        
+        // Guardar en localStorage como respaldo
+        saveDataToLocalStorage();
+    } catch (error) {
+        console.error("Error al cargar datos:", error);
+        // Usar datos locales si hay error
+        loadDataFromLocalStorage();
+    }
+}
+
 // Referencias a la base de datos
 const inventoryRef = database.ref('inventory');
 const entriesRef = database.ref('entries');
@@ -26,15 +49,43 @@ let outputs = [];
 let qrScanner = null;
 
 // Cargar datos iniciales al cargar la página
-document.addEventListener('DOMContentLoaded', function() {
-    // Configurar listeners para cambios en tiempo real
-    setupRealTimeListeners();
-    
-    // Cargar opciones de los selects
-    loadItemOptions();
-    loadItemTypeOptions();
-    loadTypeFilterOptions();
-    setDefaultDates();
+document.addEventListener('DOMContentLoaded', async function() {
+    try {
+        // Primero intentar cargar desde Firebase
+        await loadDataFromFirebase();
+        
+        // Si no hay datos en Firebase, usar los iniciales
+        if (inventory.length === 0) {
+            inventory = [...initialInventory];
+            // Guardar datos iniciales en Firebase
+            const updates = {};
+            initialInventory.forEach(item => {
+                updates['inventory/' + item.id] = item;
+            });
+            await database.ref().update(updates);
+        }
+        
+        // Cargar la interfaz
+        loadInventory();
+        checkStockAlerts();
+        loadItemOptions();
+        loadTypeFilterOptions();
+        setDefaultDates();
+    } catch (error) {
+        console.error("Error inicial:", error);
+        // Fallback a localStorage si hay error
+        loadDataFromLocalStorage();
+        if (inventory.length === 0) {
+            inventory = [...initialInventory];
+            saveDataToLocalStorage();
+        }
+        // Cargar la interfaz
+        loadInventory();
+        checkStockAlerts();
+        loadItemOptions();
+        loadTypeFilterOptions();
+        setDefaultDates();
+    }
 });
 
 // Configurar listeners para cambios en tiempo real
@@ -384,21 +435,30 @@ function saveItem() {
         expiration: itemExpiration ? new Date(itemExpiration) : null
     };
     
-    if (id) {
-        let index = inventory.findIndex(i => i.id === id);
-        if (index !== -1) {
-            inventory[index] = itemData;
+ try {
+        if (id) {
+            // Actualizar en Realtime Database
+            await database.ref('inventory/' + id).update(itemData);
+        } else {
+            // Crear nuevo en Realtime Database
+            await database.ref('inventory/' + itemNumber).set(itemData);
         }
-    } else {
-        inventory.push(itemData);
+
+        // Actualizar datos locales
+        await loadDataFromFirebase();
+        
+        // Continuar con el resto de la lógica
+        closeModal('itemModal');
+        loadInventory();
+        checkStockAlerts();
+        loadItemOptions();
+        loadTypeFilterOptions();
+        
+        alert('Insumo guardado correctamente');
+    } catch (error) {
+        console.error("Error al guardar:", error);
+        alert('Error al guardar: ' + error.message);
     }
-    
-    saveDataToLocalStorage();
-    closeModal('itemModal');
-    loadInventory();
-    checkStockAlerts();
-    loadItemOptions();
-    loadTypeFilterOptions();
 }
 
 // Generar código QR para un insumo
@@ -531,7 +591,7 @@ function openAddEntryModal() {
 }
 
 // Guardar entrada
-function saveEntry() {
+async function saveEntry() {
     let itemId = document.getElementById('entryItem').value;
     let voucher = document.getElementById('entryVoucher').value;
     let quantity = parseInt(document.getElementById('entryQuantity').value);
@@ -557,22 +617,32 @@ function saveEntry() {
         date: new Date(date).toISOString()
     };
     
-    // Guardar entrada en Firebase
-    entriesRef.child(entryId).set(entry)
-        .then(() => {
-            // Actualizar stock en Firebase
-            let newStock = inventory[itemIndex].stock + quantity;
-            inventoryRef.child(itemId).update({ stock: newStock })
-                .then(() => {
-                    closeModal('entryModal');
-                })
-                .catch(error => {
-                    alert('Error al actualizar el stock: ' + error.message);
-                });
-        })
-        .catch(error => {
-            alert('Error al guardar la entrada: ' + error.message);
+    try {
+        // Guardar en Firebase
+        const newEntryRef = database.ref('entries').push();
+        await newEntryRef.set({
+            ...entry,
+            id: newEntryRef.key
         });
+        
+        // Actualizar inventario en Firebase
+        await database.ref('inventory/' + entry.itemId + '/stock')
+            .transaction(currentStock => (currentStock || 0) + entry.quantity);
+        
+        // Actualizar datos locales
+        await loadDataFromFirebase();
+        
+        // Cerrar modal y actualizar interfaz
+        closeModal('entryModal');
+        loadInventory();
+        checkStockAlerts();
+        loadEntries();
+        
+        alert('Entrada registrada correctamente');
+    } catch (error) {
+        console.error("Error al guardar entrada:", error);
+        alert('Error al registrar entrada: ' + error.message);
+    }
 }
 
 // Ver detalles de entrada
@@ -701,7 +771,7 @@ function updateAvailableStock() {
 }
 
 // Guardar salida
-function saveOutput() {
+async function saveOutput() {
     let itemId = document.getElementById('outputItem').value;
     let os = document.getElementById('outputOS').value;
     let engineer = document.getElementById('outputEngineer').value;
@@ -737,22 +807,32 @@ function saveOutput() {
         status: movementType === 'loan' ? 'pending' : 'completed'
     };
     
-    // Guardar salida en Firebase
-    outputsRef.child(outputId).set(output)
-        .then(() => {
-            // Actualizar stock en Firebase
-            let newStock = inventory[itemIndex].stock - quantity;
-            inventoryRef.child(itemId).update({ stock: newStock })
-                .then(() => {
-                    closeModal('outputModal');
-                })
-                .catch(error => {
-                    alert('Error al actualizar el stock: ' + error.message);
-                });
-        })
-        .catch(error => {
-            alert('Error al guardar la salida: ' + error.message);
+    try {
+        // Guardar en Firebase
+        const newOutputRef = database.ref('outputs').push();
+        await newOutputRef.set({
+            ...output,
+            id: newOutputRef.key
         });
+        
+        // Actualizar inventario en Firebase
+        await database.ref('inventory/' + output.itemId + '/stock')
+            .transaction(currentStock => (currentStock || 0) - output.quantity);
+        
+        // Actualizar datos locales
+        await loadDataFromFirebase();
+        
+        // Cerrar modal y actualizar interfaz
+        closeModal('outputModal');
+        loadInventory();
+        checkStockAlerts();
+        loadOutputs();
+        
+        alert('Salida registrada correctamente');
+    } catch (error) {
+        console.error("Error al guardar salida:", error);
+        alert('Error al registrar salida: ' + error.message);
+    }
 }
 
 // Ver detalles de salida
