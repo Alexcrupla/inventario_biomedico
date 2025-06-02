@@ -18,12 +18,14 @@ const database = firebase.database();
 const inventoryRef = database.ref('inventory');
 const entriesRef = database.ref('entries');
 const outputsRef = database.ref('outputs');
+const typesRef = database.ref('types');
 
 // Datos en memoria
 let inventory = [];
 let entries = [];
 let outputs = [];
 let qrScanner = null;
+let itemTypes = [];
 
 // Cargar datos iniciales al cargar la página
 document.addEventListener('DOMContentLoaded', function() {
@@ -62,6 +64,12 @@ function setupRealTimeListeners() {
         const data = snapshot.val();
         outputs = data ? Object.values(data) : [];
         loadOutputs();
+    });
+
+    typesRef.on('value', (snapshot) => {
+      const data = snapshot.val();
+      itemTypes = data ? Object.values(data) : [];
+      loadItemTypeOptions();
     });
 }
 
@@ -244,19 +252,56 @@ function toggleCustomType() {
 
 function loadItemTypeOptions() {
     let typeSelect = document.getElementById('itemType');
-    while (typeSelect.options.length > 6) { // Mantener las 5 opciones iniciales + "OTRO"
+    
+    // Mantener las primeras 6 opciones (las fijas + "OTRO")
+    while (typeSelect.options.length > 6) {
         typeSelect.remove(6);
     }
     
-    let existingTypes = [...new Set(inventory.map(item => item.type))].filter(t => t !== 'OTRO');
-    existingTypes.forEach(type => {
+    // Agregar los tipos desde Firebase
+    itemTypes.forEach(type => {
         let option = document.createElement('option');
-        option.value = type;
-        option.textContent = type;
+        option.value = type.name;
+        option.textContent = type.name;
         typeSelect.insertBefore(option, typeSelect.options[typeSelect.options.length - 1]);
     });
 }
 
+// Función para abrir el modal de nuevo tipo
+function openAddTypeModal() {
+    document.getElementById('newTypeName').value = '';
+    document.getElementById('typeModal').style.display = 'block';
+}
+
+// Función para guardar un nuevo tipo
+function saveNewType() {
+    const typeName = document.getElementById('newTypeName').value.trim();
+    
+    if (!typeName) {
+        alert('Por favor ingrese un nombre para el tipo');
+        return;
+    }
+    
+    // Verificar si el tipo ya existe
+    if (itemTypes.some(t => t.name.toUpperCase() === typeName.toUpperCase())) {
+        alert('Este tipo ya existe');
+        return;
+    }
+    
+    const newType = {
+        id: Date.now().toString(),
+        name: typeName.toUpperCase()
+    };
+    
+    typesRef.child(newType.id).set(newType)
+        .then(() => {
+            alert('Tipo agregado correctamente');
+            closeModal('typeModal');
+        })
+        .catch(error => {
+            alert('Error al guardar el tipo: ' + error.message);
+        });
+}
 // Abrir modal para agregar insumo
 function openAddItemModal() {
     document.getElementById('itemModalTitle').textContent = 'Agregar Nuevo Insumo';
@@ -313,15 +358,36 @@ function saveItem() {
     let itemMinStock = parseInt(document.getElementById('itemMinStock').value);
     let itemExpiration = document.getElementById('itemExpiration').value;
     
+    // Manejo de tipos personalizados
     if (itemType === 'OTRO' && customType) {
-        itemType = customType;
+        itemType = customType.toUpperCase();
+        
+        // Verificar si el tipo ya existe en Firebase
+        if (!itemTypes.some(t => t.name.toUpperCase() === itemType)) {
+            // Crear nuevo tipo en Firebase
+            const newType = {
+                id: Date.now().toString(),
+                name: itemType
+            };
+            typesRef.child(newType.id).set(newType)
+                .catch(error => {
+                    console.error('Error al guardar el nuevo tipo:', error);
+                });
+        }
     }
     
+    // Validaciones
     if (!itemNumber || !itemName || !itemType || isNaN(itemInitialStock) || isNaN(itemMinStock)) {
         alert('Por favor complete todos los campos requeridos');
         return;
     }
     
+    if (itemInitialStock < 0 || itemMinStock < 1) {
+        alert('El stock inicial no puede ser negativo y el stock mínimo debe ser al menos 1');
+        return;
+    }
+    
+    // Preparar datos del insumo
     let itemData = {
         id: itemNumber,
         name: itemName,
