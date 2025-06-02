@@ -1,89 +1,25 @@
-// Funciones para manejar localStorage
-function saveDataToLocalStorage() {
-    localStorage.setItem('inventory', JSON.stringify(inventory));
-    localStorage.setItem('entries', JSON.stringify(entries));
-    localStorage.setItem('outputs', JSON.stringify(outputs));
-}
+// Configuración de Firebase
+const firebaseConfig = {
+  apiKey: "AIzaSyDrXAUR40G8OgvRGz2H20gO6aisbITC7oY",
+  authDomain: "interfaz-inventario-biomedico.firebaseapp.com",
+  databaseURL: "https://interfaz-inventario-biomedico-default-rtdb.firebaseio.com",
+  projectId: "interfaz-inventario-biomedico",
+  storageBucket: "interfaz-inventario-biomedico.appspot.com",
+  messagingSenderId: "1093995303517",
+  appId: "1:1093995303517:web:40fbc5882f4299bcfa73b4",
+  measurementId: "G-YKK4PHB6DJ"
+};
 
-function loadDataFromLocalStorage() {
-    const savedInventory = localStorage.getItem('inventory');
-    const savedEntries = localStorage.getItem('entries');
-    const savedOutputs = localStorage.getItem('outputs');
-    
-    if (savedInventory) inventory = JSON.parse(savedInventory);
-    if (savedEntries) entries = JSON.parse(savedEntries);
-    if (savedOutputs) outputs = JSON.parse(savedOutputs);
-}
+// Inicializa Firebase
+firebase.initializeApp(firebaseConfig);
+const database = firebase.database();
 
-// Datos iniciales
-const initialInventory = [
-    {
-        id: '9.1',
-        name: 'BRAZALETE REUSABLE',
-        type: 'BRAZALETE REUSABLE',
-        voucher: '19005174',
-        characteristic: '2 VÍAS',
-        brand: 'WELCH ALLYN',
-        model: 'VARIOS',
-        size: 'PEDIÁTRICO 15-21 CM 13.5-19.5 CM',
-        stock: 14,
-        minStock: 5,
-        expiration: null
-    },
-    {
-        id: '9.13',
-        name: 'MANGO DE LARINGOSCOPIO',
-        type: 'MANGO DE LARINGOSCOPIO',
-        voucher: '50290070',
-        characteristic: 'N/A',
-        brand: 'RIESTER',
-        model: 'RIESTER',
-        size: 'N/A',
-        stock: 1,
-        minStock: 5,
-        expiration: null
-    },
-    {
-        id: '9.14',
-        name: 'FOCO DE HALÓGENO 11429',
-        type: 'FOCO DE HALÓGENO',
-        voucher: '50290070',
-        characteristic: 'LARINGOSCOPIO',
-        brand: 'RIESTER',
-        model: 'RIESTER',
-        size: 'N/A',
-        stock: 16,
-        minStock: 5,
-        expiration: null
-    },
-    {
-        id: '9.15',
-        name: 'JUEGO DE CAMPANAS PARA ESTETOSCOPIO (membranas)',
-        type: 'JUEGO DE CAMPANAS',
-        voucher: '19007376-B',
-        characteristic: 'N/A',
-        brand: 'RIESTER',
-        model: 'RIESTER',
-        size: 'N/A',
-        stock: 34,
-        minStock: 5,
-        expiration: null
-    },
-    {
-        id: '9.23',
-        name: 'BATERÍA RECARGABLE',
-        type: 'BATERÍA RECARGABLE',
-        voucher: '19009555',
-        characteristic: 'LARINGOSCOPIO',
-        brand: 'WELCH ALLYN',
-        model: 'WELCH ALLYN',
-        size: 'N/A',
-        stock: 0,
-        minStock: 5,
-        expiration: null
-    }
-];
+// Referencias a la base de datos
+const inventoryRef = database.ref('inventory');
+const entriesRef = database.ref('entries');
+const outputsRef = database.ref('outputs');
 
+// Datos en memoria
 let inventory = [];
 let entries = [];
 let outputs = [];
@@ -91,20 +27,43 @@ let qrScanner = null;
 
 // Cargar datos iniciales al cargar la página
 document.addEventListener('DOMContentLoaded', function() {
-    loadDataFromLocalStorage();
+    // Configurar listeners para cambios en tiempo real
+    setupRealTimeListeners();
     
-    if (inventory.length === 0) {
-        inventory = [...initialInventory];
-        saveDataToLocalStorage();
-    }
-    
-    loadInventory();
-    checkStockAlerts();
+    // Cargar opciones de los selects
     loadItemOptions();
     loadItemTypeOptions();
     loadTypeFilterOptions();
     setDefaultDates();
 });
+
+// Configurar listeners para cambios en tiempo real
+function setupRealTimeListeners() {
+    // Listener para inventario
+    inventoryRef.on('value', (snapshot) => {
+        const data = snapshot.val();
+        inventory = data ? Object.values(data) : [];
+        loadInventory();
+        checkStockAlerts();
+        loadItemOptions();
+        loadItemTypeOptions();
+        loadTypeFilterOptions();
+    });
+    
+    // Listener para entradas
+    entriesRef.on('value', (snapshot) => {
+        const data = snapshot.val();
+        entries = data ? Object.values(data) : [];
+        loadEntries();
+    });
+    
+    // Listener para salidas
+    outputsRef.on('value', (snapshot) => {
+        const data = snapshot.val();
+        outputs = data ? Object.values(data) : [];
+        loadOutputs();
+    });
+}
 
 // Funciones para manejar las pestañas
 function openTab(evt, tabName) {
@@ -172,27 +131,26 @@ function confirmDeleteItem(id) {
 
 // Función para eliminar el insumo
 function deleteItem(id) {
-    const itemToDelete = inventory.find(item => item.id === id);
-    const deletedType = itemToDelete?.type;
-    
-    inventory = inventory.filter(item => item.id !== id);
-    entries = entries.filter(entry => entry.itemId !== id);
-    outputs = outputs.filter(output => output.itemId !== id);
-    
-    saveDataToLocalStorage();
-    
-    if (deletedType && !inventory.some(item => item.type === deletedType)) {
-        loadItemTypeOptions();
-        loadTypeFilterOptions();
-    }
-    
-    loadInventory();
-    loadEntries();
-    loadOutputs();
-    checkStockAlerts();
-    loadItemOptions();
-    
-    alert('Insumo eliminado correctamente');
+    inventoryRef.child(id).remove()
+        .then(() => {
+            // Eliminar entradas y salidas relacionadas
+            entries.forEach(entry => {
+                if (entry.itemId === id) {
+                    entriesRef.child(entry.id).remove();
+                }
+            });
+            
+            outputs.forEach(output => {
+                if (output.itemId === id) {
+                    outputsRef.child(output.id).remove();
+                }
+            });
+            
+            alert('Insumo eliminado correctamente');
+        })
+        .catch(error => {
+            alert('Error al eliminar el insumo: ' + error.message);
+        });
 }
 
 // Buscar en el inventario
@@ -281,31 +239,21 @@ function toggleCustomType() {
     } else {
         customTypeInput.style.display = 'none';
         customTypeInput.required = false;
-        customTypeInput.value = '';
     }
 }
 
 function loadItemTypeOptions() {
     let typeSelect = document.getElementById('itemType');
-    
-    // Mantener solo las opciones iniciales (las primeras 6)
-    while (typeSelect.options.length > 6) {
+    while (typeSelect.options.length > 6) { // Mantener las 5 opciones iniciales + "OTRO"
         typeSelect.remove(6);
     }
     
-    // Obtener tipos únicos del inventario, excluyendo "OTRO"
     let existingTypes = [...new Set(inventory.map(item => item.type))].filter(t => t !== 'OTRO');
-    
-    // Filtrar tipos que no están ya en las opciones iniciales
-    const initialOptions = ['BRAZALETE REUSABLE', 'MANGO DE LARINGOSCOPIO', 'FOCO DE HALÓGENO', 'JUEGO DE CAMPANAS', 'BATERÍA RECARGABLE'];
-    existingTypes = existingTypes.filter(type => !initialOptions.includes(type));
-    
-    // Agregar los tipos adicionales encontrados en el inventario
     existingTypes.forEach(type => {
         let option = document.createElement('option');
         option.value = type;
         option.textContent = type;
-        typeSelect.insertBefore(option, typeSelect.options[typeSelect.options.length - 1]); // Insertar antes de "OTRO"
+        typeSelect.insertBefore(option, typeSelect.options[typeSelect.options.length - 1]);
     });
 }
 
@@ -330,15 +278,7 @@ function editItem(id) {
     
     let typeSelect = document.getElementById('itemType');
     typeSelect.value = item.type;
-    
-    // Manejar el caso cuando el tipo no está en las opciones
-    if (![...typeSelect.options].some(opt => opt.value === item.type)) {
-        typeSelect.value = 'OTRO';
-        document.getElementById('customType').value = item.type;
-        document.getElementById('customType').style.display = 'block';
-    } else {
-        document.getElementById('customType').style.display = 'none';
-    }
+    toggleCustomType();
     
     document.getElementById('itemVoucher').value = item.voucher;
     document.getElementById('itemCharacteristic').value = item.characteristic;
@@ -373,11 +313,7 @@ function saveItem() {
     let itemMinStock = parseInt(document.getElementById('itemMinStock').value);
     let itemExpiration = document.getElementById('itemExpiration').value;
     
-    if (itemType === 'OTRO') {
-        if (!customType) {
-            alert('Por favor especifique el tipo de insumo');
-            return;
-        }
+    if (itemType === 'OTRO' && customType) {
         itemType = customType;
     }
     
@@ -397,25 +333,31 @@ function saveItem() {
         size: itemSize,
         stock: itemInitialStock,
         minStock: itemMinStock,
-        expiration: itemExpiration ? new Date(itemExpiration) : null
+        expiration: itemExpiration ? new Date(itemExpiration).toISOString() : null
     };
     
+    // Guardar en Firebase
     if (id) {
-        let index = inventory.findIndex(i => i.id === id);
-        if (index !== -1) {
-            inventory[index] = itemData;
-        }
+        // Actualizar existente
+        inventoryRef.child(id).update(itemData)
+            .then(() => {
+                alert('Insumo actualizado correctamente');
+                closeModal('itemModal');
+            })
+            .catch(error => {
+                alert('Error al actualizar: ' + error.message);
+            });
     } else {
-        inventory.push(itemData);
+        // Crear nuevo
+        inventoryRef.child(itemNumber).set(itemData)
+            .then(() => {
+                alert('Insumo agregado correctamente');
+                closeModal('itemModal');
+            })
+            .catch(error => {
+                alert('Error al guardar: ' + error.message);
+            });
     }
-    
-    saveDataToLocalStorage();
-    closeModal('itemModal');
-    loadInventory();
-    checkStockAlerts();
-    loadItemOptions();
-    loadItemTypeOptions();
-    loadTypeFilterOptions();
 }
 
 // Generar código QR para un insumo
@@ -476,7 +418,7 @@ function viewItemDetails(id) {
     `;
     
     if (item.expiration) {
-        detailsHTML += `<p><strong>Fecha de Caducidad:</strong> ${item.expiration.toLocaleDateString()}</p>`;
+        detailsHTML += `<p><strong>Fecha de Caducidad:</strong> ${new Date(item.expiration).toLocaleDateString()}</p>`;
     }
     
     document.getElementById('itemDetails').innerHTML = detailsHTML;
@@ -484,6 +426,7 @@ function viewItemDetails(id) {
     let movementsBody = document.getElementById('movementsTableBody');
     movementsBody.innerHTML = '';
     
+    // Filtrar movimientos para este item
     let itemEntries = entries.filter(entry => entry.itemId === id);
     let itemOutputs = outputs.filter(output => output.itemId === id);
     
@@ -564,22 +507,31 @@ function saveEntry() {
         return;
     }
     
+    let entryId = Date.now().toString();
     let entry = {
-        id: Date.now().toString(),
+        id: entryId,
         itemId: itemId,
         voucher: voucher,
         quantity: quantity,
-        date: new Date(date)
+        date: new Date(date).toISOString()
     };
     
-    entries.push(entry);
-    inventory[itemIndex].stock += quantity;
-    
-    saveDataToLocalStorage();
-    closeModal('entryModal');
-    loadInventory();
-    checkStockAlerts();
-    loadEntries();
+    // Guardar entrada en Firebase
+    entriesRef.child(entryId).set(entry)
+        .then(() => {
+            // Actualizar stock en Firebase
+            let newStock = inventory[itemIndex].stock + quantity;
+            inventoryRef.child(itemId).update({ stock: newStock })
+                .then(() => {
+                    closeModal('entryModal');
+                })
+                .catch(error => {
+                    alert('Error al actualizar el stock: ' + error.message);
+                });
+        })
+        .catch(error => {
+            alert('Error al guardar la entrada: ' + error.message);
+        });
 }
 
 // Ver detalles de entrada
@@ -732,25 +684,34 @@ function saveOutput() {
         return;
     }
     
+    let outputId = Date.now().toString();
     let output = {
-        id: Date.now().toString(),
+        id: outputId,
         itemId: itemId,
         os: os,
         engineer: engineer,
         quantity: quantity,
-        date: new Date(date),
+        date: new Date(date).toISOString(),
         movementType: movementType,
         status: movementType === 'loan' ? 'pending' : 'completed'
     };
     
-    outputs.push(output);
-    inventory[itemIndex].stock -= quantity;
-    
-    saveDataToLocalStorage();
-    closeModal('outputModal');
-    loadInventory();
-    checkStockAlerts();
-    loadOutputs();
+    // Guardar salida en Firebase
+    outputsRef.child(outputId).set(output)
+        .then(() => {
+            // Actualizar stock en Firebase
+            let newStock = inventory[itemIndex].stock - quantity;
+            inventoryRef.child(itemId).update({ stock: newStock })
+                .then(() => {
+                    closeModal('outputModal');
+                })
+                .catch(error => {
+                    alert('Error al actualizar el stock: ' + error.message);
+                });
+        })
+        .catch(error => {
+            alert('Error al guardar la salida: ' + error.message);
+        });
 }
 
 // Ver detalles de salida
@@ -849,15 +810,24 @@ function restoreLoan(id) {
     let itemIndex = inventory.findIndex(i => i.id === output.itemId);
     
     if (itemIndex !== -1) {
-        inventory[itemIndex].stock += output.quantity;
+        let newStock = inventory[itemIndex].stock + output.quantity;
+        
+        // Actualizar stock en Firebase
+        inventoryRef.child(output.itemId).update({ stock: newStock })
+            .then(() => {
+                // Eliminar la salida de Firebase
+                outputsRef.child(id).remove()
+                    .then(() => {
+                        // Actualizar la interfaz se hará automáticamente por los listeners
+                    })
+                    .catch(error => {
+                        alert('Error al eliminar el préstamo: ' + error.message);
+                    });
+            })
+            .catch(error => {
+                alert('Error al actualizar el stock: ' + error.message);
+            });
     }
-    
-    outputs.splice(outputIndex, 1);
-    saveDataToLocalStorage();
-    
-    loadInventory();
-    loadOutputs();
-    checkStockAlerts();
 }
 
 // Cargar salidas en la tabla
@@ -1227,7 +1197,7 @@ function generateExpiringReport() {
     
     let expiringItems = inventory.filter(item => {
         if (!item.expiration) return false;
-        return item.expiration <= limitDate && item.expiration >= today;
+        return new Date(item.expiration) <= limitDate && new Date(item.expiration) >= today;
     });
     
     if (expiringItems.length === 0) {
@@ -1253,7 +1223,7 @@ function generateExpiringReport() {
     `;
     
     expiringItems.forEach(item => {
-        let daysRemaining = Math.ceil((item.expiration - today) / (1000 * 60 * 60 * 24));
+        let daysRemaining = Math.ceil((new Date(item.expiration) - today) / (1000 * 60 * 60 * 24));
         
         html += `
             <tr>
@@ -1261,7 +1231,7 @@ function generateExpiringReport() {
                 <td>${item.name}</td>
                 <td>${item.type}</td>
                 <td>${item.stock}</td>
-                <td>${item.expiration.toLocaleDateString()}</td>
+                <td>${new Date(item.expiration).toLocaleDateString()}</td>
                 <td>${daysRemaining}</td>
             </tr>
         `;
