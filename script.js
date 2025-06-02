@@ -193,21 +193,18 @@ function filterByType() {
 
 // Cargar opciones de filtro por tipo
 function loadTypeFilterOptions() {
-    let typeFilter = document.getElementById('typeFilter');
+    const typeFilter = document.getElementById('typeFilter');
     
-    // Mantener solo la opción "Todos los tipos"
-    while (typeFilter.options.length > 1) {
-        typeFilter.remove(1);
-    }
+    // Mantener solo "Todos los tipos"
+    typeFilter.innerHTML = '<option value="all">Todos los tipos</option>';
     
-    // Obtener tipos únicos del inventario (sin duplicados)
-    let uniqueTypes = [...new Set(inventory.map(item => item.type))];
+    // Obtener tipos únicos del inventario
+    const uniqueTypes = [...new Set(inventory.map(item => item.type))];
     
     // Agregar cada tipo solo una vez
     uniqueTypes.forEach(type => {
-        // Verificar que no exista ya (aunque new Set debería evitarlo)
-        if (![...typeFilter.options].some(opt => opt.value === type)) {
-            let option = document.createElement('option');
+        if (type && ![...typeFilter.options].some(opt => opt.value === type)) {
+            const option = document.createElement('option');
             option.value = type;
             option.textContent = type;
             typeFilter.appendChild(option);
@@ -251,54 +248,49 @@ function toggleCustomType() {
 }
 
 function loadItemTypeOptions() {
-    let typeSelect = document.getElementById('itemType');
+    const typeSelect = document.getElementById('itemType');
     
-    // Mantener las opciones iniciales y cualquier tipo personalizado que se haya agregado
-    const initialOptions = ['', 'BRAZALETE REUSABLE', 'MANGO DE LARINGOSCOPIO', 'FOCO DE HALÓGENO', 'JUEGO DE CAMPANAS', 'BATERÍA RECARGABLE', 'OTRO'];
-    
-    // Guardar los tipos personalizados que ya estaban en el select
-    let customTypes = [];
-    for (let i = initialOptions.length; i < typeSelect.options.length; i++) {
-        customTypes.push(typeSelect.options[i].value);
-    }
+    // Opciones base que siempre deben estar
+    const baseOptions = [
+        {value: '', text: 'Seleccione un tipo'},
+        {value: 'BRAZALETE REUSABLE', text: 'Brazalete Reusable'},
+        {value: 'MANGO DE LARINGOSCOPIO', text: 'Mango de Laringoscopio'},
+        {value: 'FOCO DE HALÓGENO', text: 'Foco de Halógeno'},
+        {value: 'JUEGO DE CAMPANAS', text: 'Juego de Campanas'},
+        {value: 'BATERÍA RECARGABLE', text: 'Batería Recargable'},
+        {value: 'OTRO', text: 'Otro'}
+    ];
     
     // Limpiar el select
     typeSelect.innerHTML = '';
     
-    // Agregar las opciones iniciales
-    initialOptions.forEach(optionValue => {
-        let option = document.createElement('option');
-        option.value = optionValue;
-        
-        if (optionValue === '') {
-            option.textContent = 'Seleccione un tipo';
-        } else {
-            option.textContent = optionValue;
-        }
-        
-        typeSelect.appendChild(option);
+    // Agregar opciones base
+    baseOptions.forEach(option => {
+        const optElement = document.createElement('option');
+        optElement.value = option.value;
+        optElement.textContent = option.text;
+        typeSelect.appendChild(optElement);
     });
     
-    // Agregar los tipos personalizados guardados
-    customTypes.forEach(type => {
-        let option = document.createElement('option');
-        option.value = type;
-        option.textContent = type;
-        typeSelect.insertBefore(option, typeSelect.options[typeSelect.options.length - 1]); // Insertar antes de "OTRO"
-    });
-    
-    // Agregar tipos únicos del inventario que no estén ya en las opciones
-    let existingTypes = [...new Set(inventory.map(item => item.type))].filter(t => t !== 'OTRO');
+    // Obtener tipos únicos del inventario que no son opciones base
+    const existingTypes = [...new Set(inventory.map(item => item.type))];
+    const baseValues = baseOptions.map(opt => opt.value);
     
     existingTypes.forEach(type => {
-        if (![...typeSelect.options].some(opt => opt.value === type)) {
-            let option = document.createElement('option');
-            option.value = type;
-            option.textContent = type;
-            typeSelect.insertBefore(option, typeSelect.options[typeSelect.options.length - 1]); // Insertar antes de "OTRO"
+        // Solo agregar si no es una opción base y no está vacío
+        if (type && !baseValues.includes(type)) {
+            // Verificar que no exista ya
+            if (![...typeSelect.options].some(opt => opt.value === type)) {
+                const option = document.createElement('option');
+                option.value = type;
+                option.textContent = type;
+                // Insertar antes de la opción "OTRO"
+                typeSelect.insertBefore(option, typeSelect.options[typeSelect.options.length - 1]);
+            }
         }
     });
 }
+
 // Abrir modal para agregar insumo
 function openAddItemModal() {
     document.getElementById('itemModalTitle').textContent = 'Agregar Nuevo Insumo';
@@ -355,24 +347,24 @@ function saveItem() {
     let itemMinStock = parseInt(document.getElementById('itemMinStock').value);
     let itemExpiration = document.getElementById('itemExpiration').value;
     
-    // Manejar tipo personalizado
+   // Manejar tipo personalizado
     if (itemType === 'OTRO' && customType) {
         itemType = customType;
         
-        // Verificar si el tipo personalizado ya existe en las opciones
-        let typeSelect = document.getElementById('itemType');
-        let typeExists = [...typeSelect.options].some(opt => opt.value === customType);
+        // Verificar si el tipo personalizado ya existe
+        const typeSelect = document.getElementById('itemType');
+        const typeExists = [...typeSelect.options].some(opt => opt.value === customType);
         
-        // Si no existe, agregarlo como nueva opción
-        if (!typeExists) {
-            let option = document.createElement('option');
+        // Si no existe y no está vacío, agregarlo
+        if (!typeExists && customType.trim() !== '') {
+            const option = document.createElement('option');
             option.value = customType;
             option.textContent = customType;
-            // Insertar antes de la opción "OTRO"
+            // Insertar antes de "OTRO"
             typeSelect.insertBefore(option, typeSelect.options[typeSelect.options.length - 1]);
         }
     }
-    
+  
     if (!itemNumber || !itemName || !itemType || isNaN(itemInitialStock) || isNaN(itemMinStock)) {
         alert('Por favor complete todos los campos requeridos');
         return;
