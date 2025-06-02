@@ -11,10 +11,28 @@ const firebaseConfig = {
 };
 
 // Inicializa Firebase
-firebase.initializeApp(firebaseConfig);
+if (!firebase.apps.length) {
+  firebase.initializeApp(firebaseConfig);
+}
 const database = firebase.database();
 
-async function loadDataFromFirebase() {
+function saveDataToLocalStorage() {
+    localStorage.setItem('inventory', JSON.stringify(inventory));
+    localStorage.setItem('entries', JSON.stringify(entries));
+    localStorage.setItem('outputs', JSON.stringify(outputs));
+}
+
+function loadDataFromLocalStorage() {
+    const savedInventory = localStorage.getItem('inventory');
+    const savedEntries = localStorage.getItem('entries');
+    const savedOutputs = localStorage.getItem('outputs');
+    
+    if (savedInventory) inventory = JSON.parse(savedInventory);
+    if (savedEntries) entries = JSON.parse(savedEntries);
+    if (savedOutputs) outputs = JSON.parse(savedOutputs);
+}
+
+function loadDataFromFirebase() {
     try {
         // Obtener inventario
         const inventorySnapshot = await database.ref('inventory').once('value');
@@ -87,6 +105,20 @@ document.addEventListener('DOMContentLoaded', async function() {
         setDefaultDates();
     }
 });
+
+function setDefaultDates() {
+    // Verificar si los elementos existen antes de asignar valores
+    const dateFrom = document.getElementById('movementDateFrom');
+    const dateTo = document.getElementById('movementDateTo');
+    
+    if (dateFrom && dateTo) {
+        let today = new Date();
+        let firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+        
+        dateFrom.value = firstDayOfMonth.toISOString().split('T')[0];
+        dateTo.value = today.toISOString().split('T')[0];
+    }
+}
 
 // Configurar listeners para cambios en tiempo real
 function setupRealTimeListeners() {
@@ -1398,11 +1430,3 @@ function closeModal(modalId) {
     document.getElementById(modalId).style.display = 'none';
 }
 
-// Establecer fechas por defecto en los filtros
-function setDefaultDates() {
-    let today = new Date();
-    let firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-    
-    document.getElementById('movementDateFrom').value = firstDayOfMonth.toISOString().split('T')[0];
-    document.getElementById('movementDateTo').value = today.toISOString().split('T')[0];
-}
